@@ -136,7 +136,7 @@ version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "mandelbrot-image-gen"
+name = "mandelzoom"
 version = "0.1.0"
 dependencies = [
  "nalgebra 0.18.0 (registry+https://github.com/rust-lang/crates.io-index)",

@@ -1,34 +1,43 @@
+#[macro_use]
+extern crate structopt;
+
+mod options;
 mod mandelbrot;
 
 use mandelbrot::Mandelbrot;
+use options::Opt;
 
 use sfml::graphics::{Color, RenderTarget, RenderWindow};
 use sfml::system::{Clock, Vector2};
+
+use structopt::StructOpt;
 
 use nalgebra as na;
 
 use std::io;
 use std::process::Command;
-use std::str::FromStr;
+use std::path::Path;
+use std::fs;
 
-const FRAMERATE: f32 = 60.0;
-pub const IMAGE_DIMS: (u32, u32) = (512, 288); //(1920, 1080);
-pub const HALF_IMAGE_DIMS: (f64, f64) = (IMAGE_DIMS.0 as f64 / 2.0, IMAGE_DIMS.1 as f64 / 2.0);
 
-// fn clear_frames_output_folder() -> io::Result {
-//     use std::fs;
-//     use std::path::Path;
+fn create_or_clear_output_location(path: &Path) {
+    if let Err(e) = fs::create_dir(path) {   // If dir already exists, clear it
+        fs::remove_dir_all(path).unwrap();
+        fs::create_dir(path).unwrap();
+    }
 
-//     for item in fs::read_dir()
-
-//     Ok(())
-// }
+    fs::create_dir(path.join("frames")).unwrap()
+}
 
 fn main() {
-    let clock = Clock::start();
-    let mut last_time = clock.elapsed_time();
+    let opt = Opt::from_args();
 
-    let mut mandel = Mandelbrot::new();
+    create_or_clear_output_location(&opt.output_path);
+
+    // let clock = Clock::start();
+    // let mut last_time = clock.elapsed_time();
+
+    let mut mandel = Mandelbrot::new((opt.width, opt.height));
     mandel.set_focus(
         // https://youtu.be/2VuLCEZMYPM
         Vector2::new(
@@ -41,7 +50,7 @@ fn main() {
     for i in 0..240 {
         mandel.change_zoom_by(1.05);
         let image = mandel.generate_image();
-        image.save_to_file(&format!("./output/frames/frame_{}.png", i));
+        image.save_to_file(opt.output_path.join(&format!("frames/frame_{}.png", i)).to_str().unwrap());
     }
 
     // Turn images into final video
@@ -50,9 +59,9 @@ fn main() {
             "-c",
             &format!(
                 "ffmpeg -y -loglevel 24 -r {framerate} -s {width}x{height} -i ./output/frames/frame_%d.png -crf 25 ./output/video/output.mp4",
-                framerate=FRAMERATE,
-                width=IMAGE_DIMS.0,
-                height=IMAGE_DIMS.1
+                framerate=opt.framerate,
+                width=opt.width,
+                height=opt.height
             )
         ])
         .output()
