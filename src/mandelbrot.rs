@@ -1,10 +1,12 @@
 use sfml::graphics::*;
 use sfml::system::Vector2;
 
-use na::Complex;
 use nalgebra as na;
+use na::Complex;
 
-pub const MAX_ITER_COL_LIM: usize = 100;
+use palette::{Hsl, rgb::Rgb};
+
+pub const MAX_ITER_COL_LIM: usize = 200;
 
 pub struct Mandelbrot {
     pub image_dimensions: (u32, u32),
@@ -46,18 +48,15 @@ impl Mandelbrot {
         }
     }
 
-    pub fn mandelbrot_coords_to_screen_coords(&self, p: Complex<f64>) -> Vector2<f64> {
-        Vector2::new(
-            ((p.re + self.half_image_dims.0) * (self.zoom / self.image_dimensions.0 as f64)) / 2.5 - self.offset.x,
-            ((p.im + self.half_image_dims.1) * (self.zoom / self.image_dimensions.1 as f64)) / 1.5 - self.offset.y,
-        )
-    }
-
-    pub fn screen_coords_to_mandelbrot_coords(&self, p: Vector2<f64>) -> Complex<f64> {
+    pub fn image_coords_to_mandelbrot_coords(&self, p: Vector2<f64>) -> Complex<f64> {
         Complex::new(
             2.5 * (p.x - self.half_image_dims.0) / (self.zoom * self.image_dimensions.0 as f64) + self.offset.x,
             1.5 * (p.y - self.half_image_dims.1) / (self.zoom * self.image_dimensions.1 as f64) + self.offset.y,
         )
+    }
+
+    fn sfml_color_from_palette_color(rgb: Rgb) -> Color {
+        Color::rgb((rgb.red * 256.0).floor() as u8, (rgb.blue * 256.0).floor() as u8, (rgb.green * 256.0).floor() as u8)
     }
 
     pub fn generate_image(&mut self) -> Image {
@@ -65,20 +64,24 @@ impl Mandelbrot {
 
         for px in 0..self.image_dimensions.0 {
             for py in 0..self.image_dimensions.1 {
-                let iters = self.escape(
-                    self.screen_coords_to_mandelbrot_coords(Vector2::new(px as f64, py as f64)),
-                );
+                let mand_coords = self.image_coords_to_mandelbrot_coords(Vector2::new(px as f64, py as f64));
+                let (iters, z) = self.escape(mand_coords);
 
                 if iters == self.max_iter {
-                    image.set_pixel(px, py, &Color::rgb(0.0, 0.0, 0.0));
+                    image.set_pixel(px, py, &Color::rgb(0, 0, 0));
                 } else {
+                    // Iterate a few more times to reduce errors in smoothing. see http://linas.org/art-gallery/escape/escape.html
+                    let mut z2 = complex_sqr(mand_coords) + mand_coords;
+                    z2 = complex_sqr(z2) + mand_coords;
+
                     let iter_limited = iters % MAX_ITER_COL_LIM;
+                    let smooth_value = iter_limited as f32 + 2.0 - ((z.norm_sqr() as f32).sqrt().log10().log10()/2.0f32.log10());
 
-                    let ratio = iter_limited as f64 / self.max_iter as f64;
-                    let ratio_256 = (ratio * 256.0).floor() as u8;
-                    let col = Color::rgb(ratio_256, ratio_256, ratio_256);
+                    let ratio = smooth_value as f32 / MAX_ITER_COL_LIM as f32;
+                    let col_hue = Hsl::new(ratio * 360.0, 1.0, 0.5);
+                    let sfml_color = Self::sfml_color_from_palette_color(Rgb::from(col_hue));
 
-                    image.set_pixel(px, py, &col);
+                    image.set_pixel(px, py, &sfml_color);
                 }
             }
         }
@@ -86,7 +89,7 @@ impl Mandelbrot {
         image
     }
 
-    fn escape(&self, z0: Complex<f64>) -> usize {
+    fn escape(&self, z0: Complex<f64>) -> (usize, Complex<f64>) {
         let mut iterations = 0usize;
         let mut z = z0.clone();
 
@@ -95,7 +98,7 @@ impl Mandelbrot {
             iterations += 1;
         }
 
-        iterations
+        (iterations, z)
     }
 }
 

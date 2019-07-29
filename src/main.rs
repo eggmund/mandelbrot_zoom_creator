@@ -44,9 +44,10 @@ fn main() {
     for i in 0..opt.frame_count {
         mandel.change_zoom_by(opt.zoom_speed);
 
-        if i % 3 == 0 {
-            mandel.max_iter += 1;
+        if i % 4 == 0 {
+            mandel.max_iter = (mandel.max_iter as f64 * ((opt.zoom_speed - 1.0)/2.0 + 1.0)).floor() as usize;
         }
+        println!("Frame number: {}, Max Iterations: {}", i, mandel.max_iter);
 
         let image = mandel.generate_image();
         image.save_to_file(frames_location.join(&format!("frame_{}.png", i)).to_str().unwrap());
