@@ -1,0 +1,10 @@
+[package]
+name = "mandelbrot-image-gen"
+version = "0.1.0"
+authors = ["eggmund <joshuacolclough2@googlemail.com>"]
+edition = "2018"
+
+[dependencies]
+sfml = "0.14.0"
+nalgebra = "0.18.0"
+structopt = "0.2.18"
