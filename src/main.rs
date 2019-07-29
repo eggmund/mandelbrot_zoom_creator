@@ -7,14 +7,10 @@ mod mandelbrot;
 use mandelbrot::Mandelbrot;
 use options::Opt;
 
-use sfml::graphics::{Color, RenderTarget, RenderWindow};
 use sfml::system::{Clock, Vector2};
 
 use structopt::StructOpt;
 
-use nalgebra as na;
-
-use std::io;
 use std::process::Command;
 use std::path::Path;
 use std::fs;
@@ -39,18 +35,21 @@ fn main() {
 
     let mut mandel = Mandelbrot::new((opt.width, opt.height));
     mandel.set_focus(
-        // https://youtu.be/2VuLCEZMYPM
-        Vector2::new(
-            -1.7693831791955150182138472860854737829057472636547514374655282165278881912647564588361634463895296673044858257818203031574874912384217194031282461951137475212550721803797787274290,
-            0.004236847918736772214926507171367997076682670917403757279459435650112344000805545157302430995023636506313532683359652571823004948055387363061275248149392923559310270429656787009248
-        )
+        Vector2::new(opt.real_focus, opt.imaginary_focus)
     );
     mandel.set_zoom(0.5);
 
-    for i in 0..240 {
-        mandel.change_zoom_by(1.05);
+    let frames_location = opt.output_path.join("frames");
+
+    for i in 0..opt.frame_count {
+        mandel.change_zoom_by(opt.zoom_speed);
+
+        if i % 3 == 0 {
+            mandel.max_iter += 1;
+        }
+
         let image = mandel.generate_image();
-        image.save_to_file(opt.output_path.join(&format!("frames/frame_{}.png", i)).to_str().unwrap());
+        image.save_to_file(frames_location.join(&format!("frame_{}.png", i)).to_str().unwrap());
     }
 
     // Turn images into final video
@@ -58,10 +57,12 @@ fn main() {
         .args(&[
             "-c",
             &format!(
-                "ffmpeg -y -loglevel 24 -r {framerate} -s {width}x{height} -i ./output/frames/frame_%d.png -crf 25 ./output/video/output.mp4",
+                "ffmpeg -y -loglevel 24 -r {framerate} -s {width}x{height} -i {frames_loc}/frame_%d.png -crf 25 {output_video_loc}",
                 framerate=opt.framerate,
                 width=opt.width,
-                height=opt.height
+                height=opt.height,
+                frames_loc = frames_location.to_str().unwrap(),
+                output_video_loc = opt.output_path.join("output.mp4").to_str().unwrap()
             )
         ])
         .output()

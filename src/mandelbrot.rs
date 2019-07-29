@@ -4,11 +4,12 @@ use sfml::system::Vector2;
 use na::Complex;
 use nalgebra as na;
 
+pub const MAX_ITER_COL_LIM: usize = 100;
 
 pub struct Mandelbrot {
     pub image_dimensions: (u32, u32),
     pub half_image_dims: (f64, f64),
-    max_iter: usize,
+    pub max_iter: usize,
     offset: Vector2<f64>,
     pub zoom: f64,
 }
@@ -18,7 +19,7 @@ impl Mandelbrot {
         Mandelbrot {
             image_dimensions,
             half_image_dims: (image_dimensions.0 as f64/2.0, image_dimensions.1 as f64/2.0),
-            max_iter: 100,
+            max_iter: MAX_ITER_COL_LIM,
             offset: Vector2::new(0.0, 0.0),
             zoom: 1.0,
         }
@@ -68,11 +69,17 @@ impl Mandelbrot {
                     self.screen_coords_to_mandelbrot_coords(Vector2::new(px as f64, py as f64)),
                 );
 
-                let ratio = iters as f64 / self.max_iter as f64;
-                let ratio_256 = (ratio * 256.0).floor() as u8;
-                let col = Color::rgb(ratio_256, ratio_256, ratio_256);
+                if iters == self.max_iter {
+                    image.set_pixel(px, py, &Color::rgb(0.0, 0.0, 0.0));
+                } else {
+                    let iter_limited = iters % MAX_ITER_COL_LIM;
 
-                image.set_pixel(px, py, &col);
+                    let ratio = iter_limited as f64 / self.max_iter as f64;
+                    let ratio_256 = (ratio * 256.0).floor() as u8;
+                    let col = Color::rgb(ratio_256, ratio_256, ratio_256);
+
+                    image.set_pixel(px, py, &col);
+                }
             }
         }
 
