@@ -70,11 +70,12 @@ impl Mandelbrot {
                 if iters == self.max_iter {
                     image.set_pixel(px, py, &Color::rgb(0, 0, 0));
                 } else {
-                    // Iterate a few more times to reduce errors in smoothing. see http://linas.org/art-gallery/escape/escape.html
+                    // Iterate a few more times to reduce errors in smoothing. 
                     let mut z2 = complex_sqr(mand_coords) + mand_coords;
                     z2 = complex_sqr(z2) + mand_coords;
-
                     let iter_limited = iters % MAX_ITER_COL_LIM;
+
+                    // Smoothing. See http://linas.org/art-gallery/escape/escape.html
                     let smooth_value = iter_limited as f32 + 2.0 - ((z.norm_sqr() as f32).sqrt().log10().log10()/2.0f32.log10());
 
                     let ratio = smooth_value as f32 / MAX_ITER_COL_LIM as f32;
