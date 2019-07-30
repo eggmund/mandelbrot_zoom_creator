@@ -28,6 +28,11 @@ fn create_or_clear_output_location(path: &Path) {
 
 fn main() {
     let opt = Opt::from_args();
+    if opt.video_quality > 51 {
+        eprintln!("mandelzoom: Error, video quality chosen not in range 0 - 51: {}", opt.video_quality);
+        std::process::exit(1);
+    }
+
     create_or_clear_output_location(&opt.output_path);
 
     let mut framerate_history: VecDeque<f32> = VecDeque::with_capacity(4);
@@ -49,9 +54,7 @@ fn main() {
     for i in 0..opt.frame_count {
         mandel.change_zoom_by(opt.zoom_speed);
 
-        if i % 4 == 0 {
-            mandel.max_iter = (mandel.max_iter as f64 * ((opt.zoom_speed - 1.0)/2.0 + 1.0)).floor() as usize;
-        }
+        mandel.max_iter = (mandel.max_iter as f64 * ((opt.zoom_speed - 1.0)/2.0 + 1.0)).floor() as usize;
 
         let image = mandel.generate_image();
         image.save_to_file(frames_location.join(&format!("frame_{}.png", i)).to_str().unwrap());
@@ -71,14 +74,15 @@ fn main() {
         let average_framerate = total/4.0;
 
         let frame_count_left = opt.frame_count - i;
-        let time_left = frame_count_left as f32 * average_framerate;
+        let time_left = frame_count_left as f32/average_framerate;
 
         println!(
-            "Frame number: {} of {}, Frames per second: {:.2}, Time left (seconds): {:.2}",
+            "Frame number: {} of {}, Frames per second: {:.2}, Time left (seconds): {:.2}, Max iterations: {}",
             i,
             opt.frame_count,
             average_framerate,
-            time_left
+            time_left,
+            mandel.max_iter
         );
     }
 
@@ -89,12 +93,13 @@ fn main() {
         .args(&[
             "-c",
             &format!(
-                "ffmpeg -y -loglevel 24 -r {framerate} -s {width}x{height} -i {frames_loc}/frame_%d.png -crf 25 {output_video_loc}",
-                framerate=opt.framerate,
-                width=opt.width,
-                height=opt.height,
+                "ffmpeg -y -loglevel 24 -s {width}x{height} -i {frames_loc}/frame_%d.png -crf {quality} -vf 'fps={framerate},format=yuv420p' {output_video_loc}",
+                framerate = opt.framerate,
+                width = opt.width,
+                height = opt.height,
                 frames_loc = frames_location.to_str().unwrap(),
-                output_video_loc = opt.output_path.join("output.mp4").to_str().unwrap()
+                output_video_loc = opt.output_path.join("output.mp4").to_str().unwrap(),
+                quality = opt.video_quality,
             )
         ])
         .output()

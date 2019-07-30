@@ -35,4 +35,8 @@ pub struct Opt {
     /// Imaginary focus
     #[structopt(short = "i", long = "imaginary-focus", default_value = "0.004236847918736772214926507171367997076682670917403757279459435650112344000805545157302430995023636506313532683359652571823004948055387363061275248149392923559310270429656787009248")]
     pub imaginary_focus: f64,
+
+    /// ffmpeg quality input. Range is 0 - 51. Lower = better quality (0 = lossless), but at cost of file size
+    #[structopt(short = "q", long = "video-quality", default_value = "16")]
+    pub video_quality: u8,
 }

@@ -6,7 +6,10 @@ use na::Complex;
 
 use palette::{Hsl, rgb::Rgb};
 
-pub const MAX_ITER_COL_LIM: usize = 200;
+pub const ITER_COL_LIM: usize = 200;        // Iterations to repeat colour palette
+pub const INITIAL_MAX_ITER: usize = 100;
+
+const ESCAPE_RAD_SQR: f64 = 16.0;
 
 pub struct Mandelbrot {
     pub image_dimensions: (u32, u32),
@@ -21,7 +24,7 @@ impl Mandelbrot {
         Mandelbrot {
             image_dimensions,
             half_image_dims: (image_dimensions.0 as f64/2.0, image_dimensions.1 as f64/2.0),
-            max_iter: MAX_ITER_COL_LIM,
+            max_iter: INITIAL_MAX_ITER,
             offset: Vector2::new(0.0, 0.0),
             zoom: 1.0,
         }
@@ -65,20 +68,20 @@ impl Mandelbrot {
         for px in 0..self.image_dimensions.0 {
             for py in 0..self.image_dimensions.1 {
                 let mand_coords = self.image_coords_to_mandelbrot_coords(Vector2::new(px as f64, py as f64));
-                let (iters, z) = self.escape(mand_coords);
+                let (iters, mut z) = self.escape(mand_coords);
 
                 if iters == self.max_iter {
                     image.set_pixel(px, py, &Color::rgb(0, 0, 0));
                 } else {
-                    // Iterate a few more times to reduce errors in smoothing. 
-                    let mut z2 = complex_sqr(mand_coords) + mand_coords;
-                    z2 = complex_sqr(z2) + mand_coords;
-                    let iter_limited = iters % MAX_ITER_COL_LIM;
+                    // Iterate a few more times to get extra iters to smooth across.
+                    z = complex_sqr(z) + mand_coords;
+                    z = complex_sqr(z) + mand_coords;
+                    let iter_limited = (iters + 2) % ITER_COL_LIM;
 
                     // Smoothing. See http://linas.org/art-gallery/escape/escape.html
-                    let smooth_value = iter_limited as f32 + 2.0 - ((z.norm_sqr() as f32).sqrt().log10().log10()/2.0f32.log10());
+                    let smooth_value = iter_limited as f32 - ((z.norm_sqr() as f32).sqrt().log10().log10()/2.0f32.log10());
 
-                    let ratio = smooth_value as f32 / MAX_ITER_COL_LIM as f32;
+                    let ratio = smooth_value as f32 / ITER_COL_LIM as f32;
                     let col_hue = Hsl::new(ratio * 360.0, 1.0, 0.5);
                     let sfml_color = Self::sfml_color_from_palette_color(Rgb::from(col_hue));
 
@@ -94,7 +97,7 @@ impl Mandelbrot {
         let mut iterations = 0usize;
         let mut z = z0.clone();
 
-        while iterations < self.max_iter && z.norm_sqr() <= 4.0 {
+        while iterations < self.max_iter && z.norm_sqr() <= ESCAPE_RAD_SQR {
             z = complex_sqr(z) + z0;
             iterations += 1;
         }
