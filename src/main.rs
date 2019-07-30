@@ -8,11 +8,15 @@ use sfml::system::{Clock, Vector2};
 
 use structopt::StructOpt;
 
+use rug::{Complex, Float};
+
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 use std::sync::{Arc, RwLock};
 use std::thread;
+
+pub const PRECISION: u32 = 64; // Precision of complex numbers (bits)
 
 fn create_or_clear_output_location(path: &Path) {
     if let Err(_) = fs::create_dir(path) {
@@ -25,9 +29,10 @@ fn create_or_clear_output_location(path: &Path) {
 }
 
 #[inline]
-fn max_iterations_increase_formula(mut max_iter: usize, zoom_speed: f64, index: usize) -> usize {  // Returns new max iter value
+fn max_iterations_increase_formula(mut max_iter: usize, zoom_speed: f64, index: usize) -> usize {
+    // Returns new max iter value
     for _ in 0..index {
-        max_iter = (max_iter as f64 * ((zoom_speed - 1.0)/100.0 + 1.0)).floor() as usize
+        max_iter = (max_iter as f64 * ((zoom_speed - 1.0) / 20.0 + 1.0)).floor() as usize
     }
     max_iter
 }
@@ -46,11 +51,6 @@ fn main() {
 
     let dims = (opt.width, opt.height);
 
-    // let mut framerate_history: VecDeque<f32> = VecDeque::with_capacity(4);
-    // for _ in 0..4 {
-    //     framerate_history.push_back(0.0);
-    // }
-
     let num_cpu = if opt.cpu_num_to_use != 0 {
         opt.cpu_num_to_use
     } else {
@@ -60,16 +60,21 @@ fn main() {
 
     {
         let mut mandel_write = mandel.try_write().unwrap();
-        mandel_write.set_focus(Vector2::new(opt.real_focus, opt.imaginary_focus));
-        mandel_write.set_zoom(0.5);
+        mandel_write.set_focus(Complex::with_val(PRECISION, (opt.real_focus, opt.imaginary_focus)));
+        mandel_write.set_zoom(Float::with_val(PRECISION, 0.5));
     }
 
+    // Where to store generated frames
     let frames_location = Arc::new(opt.output_path.join("frames"));
 
-    // let clock = Clock::start();
-    // let mut last_time = clock.elapsed_time();
+    let clock = Clock::start();
+    let mut last_time = clock.elapsed_time();
 
-    for i in 0..(opt.frame_count as f32 / num_cpu as f32).ceil() as usize {
+    let iters = (opt.frame_count as f32 / num_cpu as f32).ceil() as usize;
+    //let extra_to_do = iters - opt.frame_count;
+    //println!("Extra frames to do at the end: {}", extra_to_do);
+
+    for i in 0..iters {
         let mut child_threads = Vec::with_capacity(num_cpu);
 
         for j in 0..num_cpu {
@@ -81,19 +86,21 @@ fn main() {
                 let mut this_mandel = Mandelbrot::new();
                 {
                     // Copy stuff from parent mandel
-                    let parent_mandel = mandel.try_read().unwrap();
-                    this_mandel.zoom = parent_mandel.zoom;
-                    this_mandel.offset = parent_mandel.offset;
+                    let parent_mandel = mandel.try_read().unwrap(); // Can just unwrap since while in the thread it should always be availabe to read.
+                    this_mandel.zoom = parent_mandel.zoom.clone();
+                    this_mandel.offset = parent_mandel.offset.clone();
                     this_mandel.max_iter = parent_mandel.max_iter;
                 }
                 let my_zoom_speed = opt.zoom_speed.powi(j as i32);
-                this_mandel.max_iter = max_iterations_increase_formula(this_mandel.max_iter, opt.zoom_speed, j);
+                this_mandel.max_iter =
+                    max_iterations_increase_formula(this_mandel.max_iter, opt.zoom_speed, j);
                 this_mandel.zoom *= my_zoom_speed;
 
+                println!("About to generate");
                 let image = this_mandel.generate_image(dims);
-                let save_loc = frames_location
-                    .join(&format!("frame_{}.png", (i * num_cpu) + j));
-            
+                println!("Finished generating");
+                let save_loc = frames_location.join(&format!("frame_{}.png", (i * num_cpu) + j));
+
                 image.save_to_file(save_loc.to_str().unwrap());
 
                 println!("Saved image to: {:#?}", save_loc);
@@ -106,39 +113,31 @@ fn main() {
         }
 
         // Increase mandelbrot values for base mandelbrot data, increasing zoom by a factor of num_core
-        {
+        let next_max_iter = {
             let mut mandel_write = mandel.try_write().unwrap();
             let overall_zoom_speed = opt.zoom_speed.powi(num_cpu as i32);
-            mandel_write.change_zoom_by(overall_zoom_speed);
-            mandel_write.max_iter = max_iterations_increase_formula(mandel_write.max_iter, overall_zoom_speed, num_cpu);
-            println!("Iterations: {}", mandel_write.max_iter);
-        }
+            mandel_write.change_zoom_by(Float::with_val(PRECISION, overall_zoom_speed));
+            mandel_write.max_iter =
+                max_iterations_increase_formula(mandel_write.max_iter, overall_zoom_speed, num_cpu);
+            mandel_write.max_iter
+        };
 
-        // // Calculate framerate and other output
-        // let current_time = clock.elapsed_time();
-        // let frame_rate = 1.0/(current_time - last_time).as_seconds();
-        // last_time = current_time;
+        // Calculate framerate and other output
+        let current_time = clock.elapsed_time();
+        let frame_rate = 1.0 / (current_time - last_time).as_seconds();
+        last_time = current_time;
 
-        // framerate_history.push_back(frame_rate);
-        // framerate_history.pop_front();
+        let frame_count_left = opt.frame_count - (i * num_cpu) + num_cpu;
+        let time_left = frame_count_left as f32 / frame_rate;
 
-        // let mut total = 0.0;
-        // for f in framerate_history.iter() {
-        //     total += f;
-        // }
-        // let average_framerate = total/4.0;
-
-        // let frame_count_left = opt.frame_count - i;
-        // let time_left = frame_count_left as f32/average_framerate;
-
-        // println!(
-        //     "Frame number: {} of {}, Frames per second: {:.2}, Time left (seconds): {:.2}, Max iterations: {}",
-        //     i,
-        //     opt.frame_count,
-        //     average_framerate,
-        //     time_left,
-        //     mandel.max_iter
-        // );
+        println!(
+            "Frame number: {} of {}, Frames per second: {:.2}, Time left (seconds): {:.2}, Next max iterations: {}",
+            (i * num_cpu) + num_cpu,
+            opt.frame_count,
+            frame_rate,
+            time_left,
+            next_max_iter
+        );
     }
 
     println!("Done! Converting to video...");
