@@ -1,17 +1,15 @@
 use sfml::graphics::*;
 use sfml::system::Vector2;
 
-use rug::{Complex, Float};
+use rug::{Assign, Complex, Float};
 
 use palette::{rgb::Rgb, Hsl};
 
 use crate::PRECISION;
 
 pub const ITER_COL_LIM: usize = 200; // Iterations to repeat colour palette
-pub const INITIAL_MAX_ITER: usize = 100;
 
 const ESCAPE_RAD_SQR: f64 = 16.0;
-
 
 #[derive(Clone)]
 pub struct Mandelbrot {
@@ -21,11 +19,11 @@ pub struct Mandelbrot {
 }
 
 impl Mandelbrot {
-    pub fn new() -> Mandelbrot {
+    pub fn new(max_iter: usize, offset: Complex, zoom: Float) -> Mandelbrot {
         Mandelbrot {
-            max_iter: INITIAL_MAX_ITER,
-            offset: Complex::new(PRECISION),
-            zoom: Float::new(PRECISION),
+            max_iter,
+            offset,
+            zoom,
         }
     }
 
@@ -48,40 +46,63 @@ impl Mandelbrot {
         self.zoom *= dz;
     }
 
-    pub fn image_coords_to_mandelbrot_coords(
-        &self,
-        p: Vector2<u32>,
-        image_dims: &(u32, u32),
-        half_image_dims: &(Float, Float),
-    ) -> Complex {
+    // pub fn image_coords_to_mandelbrot_coords(
+    //     &self,
+    //     p: Vector2<u32>,
+    //     image_dims: &(u32, u32),
+    //     half_image_dims: &(Float, Float),
+    // ) -> Complex {
+    //     Complex::with_val(
+    //         PRECISION,
+    //         (
+    //             2.5 * (Float::with_val(PRECISION, p.x) - &(half_image_dims.0))
+    //                 / (&self.zoom * Float::with_val(PRECISION, image_dims.0 as f32))
+    //                 + self.offset.real(),
+    //             1.5 * (Float::with_val(PRECISION, p.y) - &(half_image_dims.1))
+    //                 / (&self.zoom * Float::with_val(PRECISION, image_dims.1 as f32))
+    //                 + self.offset.imag(),
+    //         ),
+    //     )
+    // }
+
+    // Difference in offset between each pixel
+    fn get_pixel_diff(&self, image_dims: &(u32, u32)) -> Complex {
         Complex::with_val(
             PRECISION,
             (
-                2.5 * (Float::with_val(PRECISION, p.x) - &(half_image_dims.0))
-                    / (&self.zoom * Float::with_val(PRECISION, image_dims.0 as f32))
-                    + self.offset.real(),
-                1.5 * (Float::with_val(PRECISION, p.y) - &(half_image_dims.1))
-                    / (&self.zoom * Float::with_val(PRECISION, image_dims.1 as f32))
-                    + self.offset.imag(),
+                2.5 * Float::with_val(PRECISION, 1.0)
+                    / (&self.zoom * Float::with_val(PRECISION, image_dims.0 as f32)),
+                1.5 * Float::with_val(PRECISION, 1.0)
+                    / (&self.zoom * Float::with_val(PRECISION, image_dims.1 as f32)),
             ),
         )
     }
 
     pub fn generate_image(&self, image_dims: (u32, u32)) -> Image {
-        let half_image_dims: (Float, Float) = (
-            Float::with_val(PRECISION, image_dims.0 as f64 / 2.0),
-            Float::with_val(PRECISION, image_dims.1 as f64 / 2.0),
+        let half_image_dims: (f64, f64) = (
+            image_dims.0 as f64 / 2.0,
+            image_dims.1 as f64 / 2.0,
         );
 
         let mut image = Image::new(image_dims.0, image_dims.1);
 
+        // Increase per pixel (as mandelbrot complex num)
+        let unit_increase = self.get_pixel_diff(&image_dims);
+
         for px in 0..image_dims.0 {
             for py in 0..image_dims.1 {
-                let mand_coords = self.image_coords_to_mandelbrot_coords(
-                    Vector2::new(px, py),
-                    &image_dims,
-                    &half_image_dims,
-                );
+                let mand_coords = {
+                    let z = Complex::with_val(
+                        PRECISION,
+                        (
+                            unit_increase.real() * (px as f64 - half_image_dims.0),
+                            unit_increase.imag() * (py as f64 - half_image_dims.1)
+                        )
+                    );
+                    z + &self.offset
+                };
+
+                //println!("Mand coords: {}", mand_coords);
 
                 let (iters, mut z) = self.escape(&mand_coords);
 
@@ -115,13 +136,13 @@ impl Mandelbrot {
         let mut iterations = 0usize;
         let mut z = z0.clone();
 
-        let mut z_norm = Float::with_val(PRECISION, z0.norm_ref()).to_f64();
+        let mut z_norm = Float::with_val(PRECISION, z0.norm_ref());
 
-        while iterations < self.max_iter && z_norm <= ESCAPE_RAD_SQR {
+        while iterations < self.max_iter && z_norm.to_f64() <= ESCAPE_RAD_SQR {
             z.square_mut();
             z += z0;
 
-            z_norm = Float::with_val(PRECISION, z.norm_ref()).to_f64();
+            z_norm.assign(z.norm_ref());
 
             iterations += 1;
         }

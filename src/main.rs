@@ -16,7 +16,9 @@ use std::process::Command;
 use std::sync::{Arc, RwLock};
 use std::thread;
 
-pub const PRECISION: u32 = 64; // Precision of complex numbers (bits)
+pub const PRECISION: u32 = 128; // Precision of complex and float numbers (bits)
+pub const INITIAL_MAX_ITER: usize = 100;
+
 
 fn create_or_clear_output_location(path: &Path) {
     if let Err(_) = fs::create_dir(path) {
@@ -56,13 +58,14 @@ fn main() {
     } else {
         num_cpus::get()
     };
-    let mandel: Arc<RwLock<Mandelbrot>> = Arc::new(RwLock::new(Mandelbrot::new()));
-
-    {
-        let mut mandel_write = mandel.try_write().unwrap();
-        mandel_write.set_focus(Complex::with_val(PRECISION, (opt.real_focus, opt.imaginary_focus)));
-        mandel_write.set_zoom(Float::with_val(PRECISION, 0.5));
-    }
+    let mandel: Arc<RwLock<Mandelbrot>> = Arc::new(RwLock::new(Mandelbrot::new(
+        2000, //INITIAL_MAX_ITER,
+        Complex::with_val(
+            PRECISION,
+            (Float::parse_radix(&opt.real_focus, 10).unwrap(), Float::parse_radix(&opt.imaginary_focus, 10).unwrap()),
+        ),
+        Float::with_val(PRECISION, 100_000_000_000_000_000.0)
+    )));
 
     // Where to store generated frames
     let frames_location = Arc::new(opt.output_path.join("frames"));
@@ -83,18 +86,16 @@ fn main() {
             let mandel = Arc::clone(&mandel);
 
             child_threads.push(thread::spawn(move || {
-                let mut this_mandel = Mandelbrot::new();
-                {
+                let this_mandel = {
                     // Copy stuff from parent mandel
                     let parent_mandel = mandel.try_read().unwrap(); // Can just unwrap since while in the thread it should always be availabe to read.
-                    this_mandel.zoom = parent_mandel.zoom.clone();
-                    this_mandel.offset = parent_mandel.offset.clone();
-                    this_mandel.max_iter = parent_mandel.max_iter;
-                }
-                let my_zoom_speed = opt.zoom_speed.powi(j as i32);
-                this_mandel.max_iter =
-                    max_iterations_increase_formula(this_mandel.max_iter, opt.zoom_speed, j);
-                this_mandel.zoom *= my_zoom_speed;
+                    let mut this_mandel = parent_mandel.clone();
+
+                    let my_zoom_speed = opt.zoom_speed.powi(j as i32);
+                    this_mandel.max_iter = max_iterations_increase_formula(this_mandel.max_iter, opt.zoom_speed, j);
+                    this_mandel.zoom *= my_zoom_speed;
+                    this_mandel
+                };
 
                 println!("About to generate");
                 let image = this_mandel.generate_image(dims);
@@ -131,7 +132,7 @@ fn main() {
         let time_left = frame_count_left as f32 / frame_rate;
 
         println!(
-            "Frame number: {} of {}, Frames per second: {:.2}, Time left (seconds): {:.2}, Next max iterations: {}",
+            "Frame number: {} of {}, Frames per second: {:.6}, Time left (seconds): {:.2}, Next max iterations: {}",
             (i * num_cpu) + num_cpu,
             opt.frame_count,
             frame_rate,
@@ -140,27 +141,29 @@ fn main() {
         );
     }
 
-    println!("Done! Converting to video...");
+    println!("Done!");
 
-    // Turn images into final video
-    let output = Command::new("sh")
-        .args(&[
-            "-c",
-            &format!(
-                "ffmpeg -y -loglevel 24 -s {width}x{height} -i {frames_loc}/frame_%d.png -crf {quality} -vf 'fps={framerate},format=yuv420p' {output_video_loc}",
-                framerate = opt.framerate,
-                width = opt.width,
-                height = opt.height,
-                frames_loc = frames_location.to_str().unwrap(),
-                output_video_loc = opt.output_path.join("output.mp4").to_str().unwrap(),
-                quality = opt.video_quality,
-            )
-        ])
-        .output()
-        .expect("Failed to turn into video :(");
+    if !opt.no_video {
+        // Turn images into final video
+        let output = Command::new("sh")
+            .args(&[
+                "-c",
+                &format!(
+                    "ffmpeg -y -loglevel 24 -s {width}x{height} -i {frames_loc}/frame_%d.png -crf {quality} -vf 'fps={framerate},format=yuv420p' {output_video_loc}",
+                    framerate = opt.framerate,
+                    width = opt.width,
+                    height = opt.height,
+                    frames_loc = frames_location.to_str().unwrap(),
+                    output_video_loc = opt.output_path.join("output.mp4").to_str().unwrap(),
+                    quality = opt.video_quality,
+                )
+            ])
+            .output()
+            .expect("Failed to turn into video :(");
 
-    println!(
-        "ffmpeg warnings/errors: {}",
-        String::from_utf8(output.stderr).unwrap()
-    );
+        println!(
+            "ffmpeg warnings/errors: {}",
+            String::from_utf8(output.stderr).unwrap()
+        );
+    }
 }

@@ -32,17 +32,17 @@ pub struct Opt {
     #[structopt(
         short = "r",
         long = "real-focus",
-        default_value = "-1.7693831791955150182138472860854737829057472636547514374655282165278881912647564588361634463895296673044858257818203031574874912384217194031282461951137475212550721803797787274290"
+        default_value = "-1.769383179195515018213847286085473782905747263654751437465528216527888191264756458836163446389529667304485825781820303157487491238421719403128246195113747521255072180379778727429039155281457214"
     )]
-    pub real_focus: f64,
+    pub real_focus: String,
 
     /// Imaginary focus.
     #[structopt(
         short = "i",
         long = "imaginary-focus",
-        default_value = "0.004236847918736772214926507171367997076682670917403757279459435650112344000805545157302430995023636506313532683359652571823004948055387363061275248149392923559310270429656787009248"
+        default_value = "0.004236847918736772214926507171367997076682670917403757279459435650112344000805545157302430995023636506313532683359652571823004948055387363061275248149392923559310270429656787009247955481321870"
     )]
-    pub imaginary_focus: f64,
+    pub imaginary_focus: String,
 
     /// ffmpeg quality input. Range is 0 - 51. Lower = better quality (0 = lossless), but at cost of file size.
     #[structopt(short = "q", long = "video-quality", default_value = "16")]
@@ -51,4 +51,8 @@ pub struct Opt {
     /// Number of cpu cores to use to render the frames. Defaults to number of cores in machine.
     #[structopt(short = "n", long = "cpu-num", default_value = "0")]
     pub cpu_num_to_use: usize,
+
+    /// Do not convert frames into video at the end.
+    #[structopt(long = "no-video")]
+    pub no_video: bool,
 }
