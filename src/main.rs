@@ -16,7 +16,7 @@ use std::process::Command;
 use std::sync::{Arc, RwLock};
 use std::thread;
 
-pub const PRECISION: u32 = 128; // Precision of complex and float numbers (bits)
+pub static PRECISION: u32 = 128; // Precision of complex and float numbers (bits)
 pub const INITIAL_MAX_ITER: usize = 100;
 
 
@@ -64,7 +64,7 @@ fn main() {
             PRECISION,
             (Float::parse_radix(&opt.real_focus, 10).unwrap(), Float::parse_radix(&opt.imaginary_focus, 10).unwrap()),
         ),
-        Float::with_val(PRECISION, 100_000_000_000_000_000.0)
+        Float::with_val(PRECISION, 1_000_000_000_000_000_000.0)
     )));
 
     // Where to store generated frames
