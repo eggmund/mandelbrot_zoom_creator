@@ -48,9 +48,9 @@ pub struct Opt {
     #[structopt(short = "q", long = "video-quality", default_value = "16")]
     pub video_quality: u8,
 
-    /// Number of cpu cores to use to render the frames. Defaults to number of cores in machine.
-    #[structopt(short = "n", long = "cpu-num", default_value = "0")]
-    pub cpu_num_to_use: usize,
+    /// Number of threads to use to render the frames. Defaults to number of CPU cores in machine.
+    #[structopt(short = "n", long = "thread-num", default_value = "0")]
+    pub thread_num: usize,
 
     /// Do not convert frames into video at the end.
     #[structopt(long = "no-video")]
