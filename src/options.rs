@@ -55,4 +55,8 @@ pub struct Opt {
     /// Do not convert frames into video at the end.
     #[structopt(long = "no-video")]
     pub no_video: bool,
+
+    /// Initial maximum iterations to use. Higher = more defined boundaries, at cost of performance.
+    #[structopt(short = "m", long = "max-iters", default_value = "100")]
+    pub initial_max_iters: usize,
 }

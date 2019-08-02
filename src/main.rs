@@ -16,8 +16,7 @@ use std::path::Path;
 use std::process::Command;
 use std::sync::Arc;
 
-pub static PRECISION: u32 = 64; // Precision of complex and float numbers (bits)
-pub const INITIAL_MAX_ITER: usize = 100;
+pub static PRECISION: u32 = 256; // Precision of complex and float numbers (bits)
 
 fn create_or_clear_output_location(path: &Path) {
     if let Err(_) = fs::create_dir(path) {
@@ -32,7 +31,7 @@ fn create_or_clear_output_location(path: &Path) {
 #[inline]
 fn max_iterations_increase_formula(max_iter: usize, zoom_speed: f64) -> usize {
     // Returns new max iter value
-    (max_iter as f64 * ((zoom_speed - 1.0) / 20.0 + 1.0)).floor() as usize
+    (max_iter as f64 * ((zoom_speed - 1.0)/10.0 + 1.0)).floor() as usize
 }
 
 fn main() {
@@ -56,15 +55,15 @@ fn main() {
         num_cpus::get()
     };
     let mut mandel: Mandelbrot = Mandelbrot::new(
-        INITIAL_MAX_ITER,
+        opt.initial_max_iters,
         Complex::with_val(
             PRECISION,
             (
                 Float::parse_radix(&opt.real_focus, 10).unwrap(),
-                Float::parse_radix(&opt.imaginary_focus, 10).unwrap(),
-            ),
+                Float::parse_radix(&opt.imaginary_focus, 10).unwrap()
+            )
         ),
-        Float::with_val(PRECISION, 1.0),
+        Float::with_val(PRECISION, 1),
         thread_num,
     );
 

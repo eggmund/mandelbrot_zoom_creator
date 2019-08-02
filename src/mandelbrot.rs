@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use crate::{
     threadpool::{Job, JobResult, ThreadPool},
-    PRECISION,
+    PRECISION
 };
 
 pub const ITER_COL_LIM: usize = 200; // Iterations to repeat colour palette
@@ -68,7 +68,7 @@ impl Mandelbrot {
                 1.5 * Float::with_val(PRECISION, p.y as f64 - half_image_dims.1)
                     / (&self.zoom * Float::with_val(PRECISION, image_dims.1 as f32))
                     + self.offset.imag(),
-            ),
+            )
         )
     }
 
