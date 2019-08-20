@@ -16,7 +16,7 @@ use std::path::Path;
 use std::process::Command;
 use std::sync::Arc;
 
-pub static PRECISION: u32 = 256; // Precision of complex and float numbers (bits)
+pub static PRECISION: u32 = 128; // Precision of complex and float numbers (bits)
 
 fn create_or_clear_output_location(path: &Path) {
     if let Err(_) = fs::create_dir(path) {
@@ -103,7 +103,7 @@ fn main() {
         );
     }
 
-    println!("Done!");
+    println!("Done in {} seconds.", clock.elapsed_time().as_seconds());
 
     if !opt.no_video {
         // Turn images into final video
